@@ -282,7 +282,7 @@ static void complete_request(
         usb_request_release(req->setup_req);
     }
 
-    zxlogf(TRACE, "dwc-usb: complete request. id = %u, status = %d, "
+    zxlogf(INFO, "dwc-usb: complete request. id = %u, status = %d, "
             "length = %lu\n", req->request_id, status, length);
 
     usb_request_t* usb_req = req->usb_req;
@@ -655,26 +655,7 @@ zx_status_t dwc_hub_device_added(void* _ctx, uint32_t hub_address, int port,
 
     completion_t completion = COMPLETION_INIT;
 
-    get_desc->complete_cb = usb_control_complete;
-    get_desc->cookie = &completion;
-    get_desc->header.length = 8;
-    get_desc->header.device_id = 0;
-
-    get_desc->setup.bmRequestType = USB_ENDPOINT_IN;
-    get_desc->setup.bRequest = USB_REQ_GET_DESCRIPTOR;
-    get_desc->setup.wValue = (USB_DT_DEVICE << 8);
-    get_desc->setup.wIndex = 0;
-    get_desc->setup.wLength = 8;
-
-    dwc_request_queue(dwc, get_desc);
-    completion_wait(&completion, ZX_TIME_INFINITE);
-
-    usb_device_descriptor_t short_descriptor;
-    usb_request_copyfrom(get_desc, &short_descriptor, get_desc->response.actual, 0);
-
-    // Update the Max Packet Size of the control endpoint.
-    ep0->desc.wMaxPacketSize = short_descriptor.bMaxPacketSize0;
-
+#if 1
     // Set the Device ID of the newly added device.
     usb_request_t* set_addr = usb_request_pool_get(&dwc->free_usb_reqs, 64);
     if (set_addr == NULL) {
@@ -695,8 +676,86 @@ zx_status_t dwc_hub_device_added(void* _ctx, uint32_t hub_address, int port,
     set_addr->setup.wIndex = 0;
     set_addr->setup.wLength = 0;
 
+printf("dwc_hub_device_added dwc_request_queue set_addr\n");
     dwc_request_queue(dwc, set_addr);
     completion_wait(&completion, ZX_TIME_INFINITE);
+printf("dwc_hub_device_added wait returned\n");
+#endif
+
+
+
+
+for (int tries = 0; tries < 5; tries++) {
+completion_reset(&completion);
+    
+    get_desc->complete_cb = usb_control_complete;
+    get_desc->cookie = &completion;
+    get_desc->header.length = 8;
+    get_desc->header.device_id = 0;
+
+    get_desc->setup.bmRequestType = USB_ENDPOINT_IN;
+    get_desc->setup.bRequest = USB_REQ_GET_DESCRIPTOR;
+    get_desc->setup.wValue = (USB_DT_DEVICE << 8);
+    get_desc->setup.wIndex = 0;
+    get_desc->setup.wLength = 8;
+
+printf("dwc_hub_device_added dwc_request_queue get_desc\n");
+    dwc_request_queue(dwc, get_desc);
+    completion_wait(&completion, ZX_TIME_INFINITE);
+printf("dwc_hub_device_added wait returned\n");
+
+    if (get_desc->response.status == ZX_OK) {
+        break;
+    }
+}
+
+    usb_device_descriptor_t short_descriptor;
+    usb_request_copyfrom(get_desc, &short_descriptor, get_desc->response.actual, 0);
+printf("get_desc->response.actual: %zu\n", get_desc->response.actual);
+printf("  bLength: %u\n", short_descriptor.bLength);
+printf("  bDescriptorType: %x\n", short_descriptor.bDescriptorType);
+printf("  bcdUSB: %x\n", short_descriptor.bcdUSB);
+printf("  bDeviceClass: %u\n", short_descriptor.bDeviceClass);
+printf("  bDeviceSubClass: %u\n", short_descriptor.bDeviceSubClass);
+printf("  bDeviceProtocol: %u\n", short_descriptor.bDeviceProtocol);
+printf("  bMaxPacketSize0: %u\n", short_descriptor.bMaxPacketSize0);
+printf("  idVendor: %x\n", short_descriptor.idVendor);
+printf("  idProduct: %x\n", short_descriptor.idProduct);
+printf("  bcdDevice: %x\n", short_descriptor.bcdDevice);
+printf("  iManufacturer: %u\n", short_descriptor.iManufacturer);
+printf("  iProduct: %u\n", short_descriptor.iProduct);
+printf("  iSerialNumber: %u\n", short_descriptor.iSerialNumber);
+printf("  bNumConfigurations: %u\n", short_descriptor.bNumConfigurations);
+
+    // Update the Max Packet Size of the control endpoint.
+    ep0->desc.wMaxPacketSize = short_descriptor.bMaxPacketSize0;
+
+#if 0
+    // Set the Device ID of the newly added device.
+    usb_request_t* set_addr = usb_request_pool_get(&dwc->free_usb_reqs, 64);
+    if (set_addr == NULL) {
+        zx_status_t status = usb_request_alloc(&set_addr, 64, 0);
+        assert(status == ZX_OK);
+    }
+
+    completion_reset(&completion);
+
+    set_addr->complete_cb = usb_control_complete;
+    set_addr->cookie = &completion;
+    set_addr->header.length = 0;
+    set_addr->header.device_id = 0;
+
+    set_addr->setup.bmRequestType = USB_ENDPOINT_OUT;
+    set_addr->setup.bRequest = USB_REQ_SET_ADDRESS;
+    set_addr->setup.wValue = dwc->next_device_address;
+    set_addr->setup.wIndex = 0;
+    set_addr->setup.wLength = 0;
+
+printf("dwc_hub_device_added dwc_request_queue set_addr\n");
+    dwc_request_queue(dwc, set_addr);
+    completion_wait(&completion, ZX_TIME_INFINITE);
+printf("dwc_hub_device_added wait returned\n");
+#endif
 
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
@@ -729,13 +788,15 @@ zx_status_t dwc_hub_device_added(void* _ctx, uint32_t hub_address, int port,
     ctx->ep = ctrl_endpoint;
     ctx->dwc = dwc;
 
-    thrd_create(
+ printf("dwc_hub_device_added thrd_create\n");
+   thrd_create(
         &ctrl_endpoint->request_scheduler_thread,
         endpoint_request_scheduler_thread,
         (void*)ctx);
 
     mtx_unlock(&dwc->usb_devices[dwc->next_device_address].devmtx);
 
+ printf("dwc_hub_device_added usb_bus_add_device\n");
     usb_bus_add_device(&dwc->bus, dwc->next_device_address, hub_address, speed);
 
     dwc->next_device_address++;
@@ -780,6 +841,8 @@ static void dwc_handle_channel_irq(uint32_t channel, dwc_usb_t* dwc) {
 
 static void dwc_handle_irq(dwc_usb_t* dwc) {
     union dwc_core_interrupts interrupts = regs->core_interrupts;
+
+printf("dwc_handle_irq: %08x\n", interrupts.port_intr);
 
     if (interrupts.port_intr) {
         // Clear the interrupt.
@@ -1335,6 +1398,7 @@ static bool handle_normal_channel_halted(uint channel,
 
     uint32_t packets_remaining = chanptr->transfer.packet_count;
     uint32_t packets_transferred = req->packets_queued - packets_remaining;
+printf("handle_normal_channel_halted packets_remaining %u packets_transferred %u\n", packets_remaining, packets_transferred);
 
     usb_request_t* usb_req = req->usb_req;
 
@@ -1374,6 +1438,7 @@ static bool handle_normal_channel_halted(uint channel,
 
                 release_channel(channel, dwc);
 
+printf("complete_request ZX_ERR_IO 3\n");
                 complete_request(req, ZX_ERR_IO, 0, dwc);
 
                 return true;
@@ -1382,6 +1447,8 @@ static bool handle_normal_channel_halted(uint channel,
 
             if (req->short_attempt && req->bytes_queued == 0 &&
                 (usb_ep_type(&ep->desc) != USB_ENDPOINT_INTERRUPT)) {
+printf("Requeue the request\n");
+
                 req->complete_split = false;
                 req->next_data_toggle = chanptr->transfer.packet_id;
 
@@ -1396,6 +1463,7 @@ static bool handle_normal_channel_halted(uint channel,
 
             if ((usb_ep_type(&ep->desc) == USB_ENDPOINT_CONTROL) &&
                 (req->ctrl_phase < CTRL_PHASE_STATUS)) {
+printf("req->ctrl_phase < CTRL_PHASE_STATUS\n");
                 req->complete_split = false;
 
                 if (req->ctrl_phase == CTRL_PHASE_SETUP) {
@@ -1419,6 +1487,7 @@ static bool handle_normal_channel_halted(uint channel,
             }
 
             release_channel(channel, dwc);
+printf("complete_request ZX_OK\n");
             complete_request(req, ZX_OK, req->bytes_transferred, dwc);
             return true;
         } else {
@@ -1426,6 +1495,7 @@ static bool handle_normal_channel_halted(uint channel,
                 req->complete_split = !req->complete_split;
             }
 
+printf("restart transaction\n");
             // Restart the transaction.
             dwc_start_transaction(channel, req);
             return false;
@@ -1438,6 +1508,7 @@ static bool handle_normal_channel_halted(uint channel,
             return false;
         } else {
             release_channel(channel, dwc);
+printf("complete_request ZX_ERR_IO 1\n");
             complete_request(req, ZX_ERR_IO, 0, dwc);
             return true;
         }
@@ -1450,6 +1521,8 @@ static bool handle_channel_halted_interrupt(uint channel,
                                             union dwc_host_channel_interrupts interrupts,
                                             dwc_usb_t* dwc) {
     volatile struct dwc_host_channel* chanptr = &regs->host_channels[channel];
+
+printf("handle_channel_halted_interrupt: %08x\n", interrupts.val);
 
     if (interrupts.stall_response_received || interrupts.ahb_error ||
         interrupts.transaction_error || interrupts.babble_error ||
@@ -1470,6 +1543,7 @@ static bool handle_channel_halted_interrupt(uint channel,
         release_channel(channel, dwc);
 
         // Complete the request with a failure.
+printf("complete_request ZX_ERR_IO 2\n");
         complete_request(req, ZX_ERR_IO, 0, dwc);
 
         return true;
@@ -1756,6 +1830,8 @@ static zx_status_t usb_dwc_bind(void* ctx, zx_device_t* dev) {
     // TODO(gkalsi):
     // The BCM Mailbox Driver currently turns on USB power but it should be
     // done here instead.
+
+regs->core_usb_configuration |= DWC_FORCE_H0ST_MODE;
 
     if ((st = usb_dwc_softreset_core()) != ZX_OK) {
         zxlogf(ERROR, "usb_dwc: failed to reset core.\n");

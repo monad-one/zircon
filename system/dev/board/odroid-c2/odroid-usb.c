@@ -18,7 +18,10 @@
 #define GPIO_HUB_RESET  S905_GPIOAO(4)
 #define GPIO_VBUS       S905_GPIOAO(5)
 
-/*
+#define USE_OTG 1
+#define USE_HOST 1
+
+#if USE_OTG
 static const pbus_mmio_t usb_otg_mmios[] = {
     {
         .base = 0xc9000000,
@@ -43,8 +46,9 @@ static const pbus_dev_t usb_otg_dev = {
     .irqs = usb_otg_irqs,
     .irq_count = countof(usb_otg_irqs),
 };
-*/
+#endif
 
+#if USE_HOST
 static const pbus_mmio_t usb_host_mmios[] = {
     {
         .base = 0xc9100000,
@@ -69,6 +73,7 @@ static const pbus_dev_t usb_host_dev = {
     .irqs = usb_host_irqs,
     .irq_count = countof(usb_host_irqs),
 };
+#endif
 
 zx_status_t odroid_usb_init(odroid_t* odroid) {
     zx_status_t status;
@@ -108,22 +113,24 @@ printf("after %08x\n", temp);
         return status;
     }
 
+for (int offset = 0; offset <= 8; offset += 8) {
     regs = io_buffer_virt(&phy);
-    temp = readl(regs + 8); // config
+    temp = readl(regs + offset); // config
     temp |= (1 << 16); // clk_32k_alt_sel
-    writel(temp, regs + 8);
+    writel(temp, regs + offset);
 
-    temp = readl(regs + 9); // ctrl
+    temp = readl(regs + offset + 1); // ctrl
     temp &= ~(7 << 22); // fsel
     temp |= (5 << 22);
     temp |= (1 << 15); // por
-    writel(temp, regs + 9);
+    writel(temp, regs + offset + 1);
     usleep(500);
     temp &= ~(1 << 15); // por
-    writel(temp, regs + 9);
+    writel(temp, regs + offset + 1);
     usleep(500);
-    temp = readl(regs + 9);
+    temp = readl(regs + offset + 1);
     usleep(500);
+}
 
     // only for port b
     temp = readl(regs + 11); // adp_bc
@@ -147,27 +154,28 @@ printf("after %08x\n", temp);
 */
     io_buffer_release(&phy);
 
+#if USE_HOST
     gpio_config(&odroid->gpio, GPIO_HUB_RESET, GPIO_DIR_OUT);
     gpio_write(&odroid->gpio, GPIO_HUB_RESET, 0);
     usleep(20 * 1000);
     gpio_write(&odroid->gpio, GPIO_HUB_RESET, 1);
     usleep(20 * 1000);
-sleep(1);
-
-/*
-    gpio_config(&odroid->gpio, GPIO_VBUS, GPIO_DIR_OUT);
-    gpio_write(&odroid->gpio, GPIO_VBUS, 1);
-*/
 
     if ((status = pbus_device_add(&odroid->pbus, &usb_host_dev, 0)) != ZX_OK) {
         zxlogf(ERROR, "odroid_usb_init could not add usb_host_dev: %d\n", status);
         return status;
     }
-/*
+#endif
+
+#if USE_OTG
+    gpio_config(&odroid->gpio, GPIO_VBUS, GPIO_DIR_OUT);
+    gpio_write(&odroid->gpio, GPIO_VBUS, 1);
+
     if ((status = pbus_device_add(&odroid->pbus, &usb_otg_dev, 0)) != ZX_OK) {
         zxlogf(ERROR, "odroid_usb_init could not add usb_otg_dev: %d\n", status);
         return status;
     }
-*/
+#endif
+
     return ZX_OK;
 }

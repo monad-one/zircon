@@ -71,9 +71,11 @@ struct dwc_regs {
  */
 #define DWC_AHB_DMA_ENABLE        (1 << 5)
 
-    /* 0x01c : Core USB configuration */
+    /* 0x00c : Core USB configuration */
     uint32_t core_usb_configuration;
 
+#define DWC_FORCE_H0ST_MODE       (1 << 2)
+#define DWC_FORCE_DEV_MODE        (1 << 1)
 
     /**
      * 0x010 : Core Reset Register.
