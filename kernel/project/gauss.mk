@@ -4,7 +4,11 @@
 # https://opensource.org/licenses/MIT
 
 ARCH := arm64
-TARGET := gauss
+TARGET := arm64
+SUB_TARGET := gauss
+
+BUILD_BOOTDATA := true
+USE_TARGET_BUILD_DIR := true
 
 include kernel/project/virtual/user.mk
 include kernel/project/virtual/test.mk

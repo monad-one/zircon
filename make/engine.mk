@@ -118,11 +118,124 @@ GLOBAL_DEBUGFLAGS := -O0 -g3
 endif
 GLOBAL_DEBUGFLAGS ?= -O2 -g
 
+# master module object list
+ALLOBJS_MODULE :=
+
+# all module objects for the target (does not include hostapp)
+ALL_TARGET_OBJS :=
+
+# master object list (for dep generation)
+ALLOBJS :=
+
+# master source file list
+ALLSRCS :=
+
+# master list of packages for export
+ALLPKGS :=
+
+# anything you add here will be deleted in make clean
+GENERATED :=
+
+# anything added to GLOBAL_DEFINES will be put into $(BUILDDIR)/config-global.h
+GLOBAL_DEFINES :=
+
+# anything added to KERNEL_DEFINES will be put into $(BUILDDIR)/config-kernel.h
+KERNEL_DEFINES := LK=1 _KERNEL=1 ZIRCON_TOOLCHAIN=1
+
+# anything added to USER_DEFINES will be put into $(BUILDDIR)/config-user.h
+USER_DEFINES := ZIRCON_TOOLCHAIN=1
+
+# anything added to HOST_DEFINES will be put into $(BUILDDIR)/config-host.h
+HOST_DEFINES :=
+
+# Anything added to GLOBAL_SRCDEPS will become a dependency of every source file in the system.
+# Useful for header files that may be included by one or more source files.
+GLOBAL_SRCDEPS :=
+
+# Anything added to TARGET_SRCDEPS will become a dependency of every target module file in the system.
+# Useful for header files that may be included by one or more source files.
+TARGET_MODDEPS :=
+
+# this is the *true* allmodules, to check for duplicate modules
+# (since submodules do not contribute to ALLMODULES)
+DUPMODULES :=
+
+# add any external module dependencies
+MODULES := $(EXTERNAL_MODULES)
+
+# any .mk specified here will be included before build.mk
+EXTRA_BUILDRULES :=
+
+# any rules you put here will also be built by the system before considered being complete
+EXTRA_BUILDDEPS := makefile
+
+# any rules you put here will be built if the kernel is also being built
+EXTRA_KERNELDEPS :=
+
+# any rules you put here will be depended on in clean builds
+EXTRA_CLEANDEPS :=
+
+# build ids
+EXTRA_IDFILES :=
+
+# any objects you put here get linked with the final image
+EXTRA_OBJS :=
+
+# userspace apps to build and include in initfs
+ALLUSER_APPS :=
+
+# userspace app modules
+ALLUSER_MODULES :=
+
+# userspace lib modules
+ALLUSER_LIBS :=
+
+# host apps to build
+ALLHOST_APPS :=
+
+# host libs to build
+ALLHOST_LIBS :=
+
+# EFI libs to build
+ALLEFI_LIBS :=
+
+# sysroot (exported libraries and headers)
+SYSROOT_DEPS :=
+
+# MDI source files used to generate the mdi.bin binary blob
+MDI_SRCS :=
+
+# MDI source files used to generate the mdi-defs.h header file
+MDI_INCLUDES := system/public/zircon/mdi/zircon.mdi
+
+# these need to be filled out by the project/target/platform rules.mk files
+TARGET :=
+PLATFORM :=
+ARCH :=
+ALLMODULES :=
+
+# optional sub-target
+SUB_TARGET :=
+
+
+# try to include the project file
+# this must be done before computing BUILDDIR
+-include kernel/project/$(PROJECT).mk
+ifndef TARGET
+$(error couldn't find project or project doesn't define target)
+endif
+
+ifeq ($(call TOBOOL,$(USE_TARGET_BUILD_DIR)),true)
+BUILDDIR := $(BUILDROOT)/build-$(TARGET)$(BUILDDIR_SUFFIX)
+else
 BUILDDIR := $(BUILDROOT)/build-$(PROJECT)$(BUILDDIR_SUFFIX)
+endif
+
 GENERATED_INCLUDES:=$(BUILDDIR)/gen/global/include
 OUTLKBIN := $(BUILDDIR)/$(LKNAME).bin
 OUTLKELF := $(BUILDDIR)/$(LKNAME).elf
 GLOBAL_CONFIG_HEADER := $(BUILDDIR)/config-global.h
+GLOBAL_SRCDEPS += $(GLOBAL_CONFIG_HEADER)
 KERNEL_CONFIG_HEADER := $(BUILDDIR)/config-kernel.h
 USER_CONFIG_HEADER := $(BUILDDIR)/config-user.h
 HOST_CONFIG_HEADER := $(BUILDDIR)/config-host.h
@@ -279,102 +392,6 @@ ARCH_ASMFLAGS :=
 # top level rule
 all::
 
-# master module object list
-ALLOBJS_MODULE :=
-
-# all module objects for the target (does not include hostapp)
-ALL_TARGET_OBJS :=
-
-# master object list (for dep generation)
-ALLOBJS :=
-
-# master source file list
-ALLSRCS :=
-
-# master list of packages for export
-ALLPKGS :=
-
-# anything you add here will be deleted in make clean
-GENERATED :=
-
-# anything added to GLOBAL_DEFINES will be put into $(BUILDDIR)/config-global.h
-GLOBAL_DEFINES :=
-
-# anything added to KERNEL_DEFINES will be put into $(BUILDDIR)/config-kernel.h
-KERNEL_DEFINES := LK=1 _KERNEL=1 ZIRCON_TOOLCHAIN=1
-
-# anything added to USER_DEFINES will be put into $(BUILDDIR)/config-user.h
-USER_DEFINES := ZIRCON_TOOLCHAIN=1
-
-# anything added to HOST_DEFINES will be put into $(BUILDDIR)/config-host.h
-HOST_DEFINES :=
-
-# Anything added to GLOBAL_SRCDEPS will become a dependency of every source file in the system.
-# Useful for header files that may be included by one or more source files.
-GLOBAL_SRCDEPS := $(GLOBAL_CONFIG_HEADER)
-
-# Anything added to TARGET_SRCDEPS will become a dependency of every target module file in the system.
-# Useful for header files that may be included by one or more source files.
-TARGET_MODDEPS :=
-
-# these need to be filled out by the project/target/platform rules.mk files
-TARGET :=
-PLATFORM :=
-ARCH :=
-ALLMODULES :=
-
-# this is the *true* allmodules, to check for duplicate modules
-# (since submodules do not contribute to ALLMODULES)
-DUPMODULES :=
-
-# add any external module dependencies
-MODULES := $(EXTERNAL_MODULES)
-
-# any .mk specified here will be included before build.mk
-EXTRA_BUILDRULES :=
-
-# any rules you put here will also be built by the system before considered being complete
-EXTRA_BUILDDEPS :=
-
-# any rules you put here will be built if the kernel is also being built
-EXTRA_KERNELDEPS :=
-
-# any rules you put here will be depended on in clean builds
-EXTRA_CLEANDEPS :=
-
-# build ids
-EXTRA_IDFILES :=
-
-# any objects you put here get linked with the final image
-EXTRA_OBJS :=
-
-# userspace apps to build and include in initfs
-ALLUSER_APPS :=
-
-# userspace app modules
-ALLUSER_MODULES :=
-
-# userspace lib modules
-ALLUSER_LIBS :=
-
-# host apps to build
-ALLHOST_APPS :=
-
-# host libs to build
-ALLHOST_LIBS :=
-
-# EFI libs to build
-ALLEFI_LIBS :=
-
-# sysroot (exported libraries and headers)
-SYSROOT_DEPS :=
-
-# MDI source files used to generate the mdi.bin binary blob
-MDI_SRCS :=
-
-# MDI source files used to generate the mdi-defs.h header file
-MDI_INCLUDES := system/public/zircon/mdi/zircon.mdi
-
 # For now always enable frame pointers so kernel backtraces
 # can work and define WITH_PANIC_BACKTRACE to enable them in panics
 # ZX-623
@@ -382,8 +399,17 @@ KERNEL_DEFINES += WITH_PANIC_BACKTRACE=1 WITH_FRAME_POINTERS=1
 KERNEL_COMPILEFLAGS += $(KEEP_FRAME_POINTER_COMPILEFLAGS)
 
 # userspace boot file system generated by the build system
+ifneq ($(SUB_TARGET),)
+USER_BOOTDATA := $(BUILDDIR)/bootdata-$(SUB_TARGET).bin
+USER_FS := $(BUILDDIR)/user-$(SUB_TARGET).fs
+else
 USER_BOOTDATA := $(BUILDDIR)/bootdata.bin
 USER_FS := $(BUILDDIR)/user.fs
+endif
+
+ifeq ($(call TOBOOL,$(BUILD_BOOTDATA)),true)
+EXTRA_BUILDDEPS += $(USER_BOOTDATA)
+endif
 
 # additional bootdata items to be included to bootdata.bin
 ADDITIONAL_BOOTDATA_ITEMS :=
@@ -414,11 +440,6 @@ endif
 .PHONY: FORCE
 FORCE:
 
-# try to include the project file
--include kernel/project/$(PROJECT).mk
-ifndef TARGET
-$(error couldn't find project or project doesn't define target)
-endif
 include kernel/target/$(TARGET)/rules.mk
 ifndef PLATFORM
 $(error couldn't find target or target doesn't define platform)

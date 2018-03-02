@@ -12,5 +12,7 @@ ARCH := x86
 SUBARCH := x86-64
 TARGET := pc-x86
 
+BUILD_BOOTDATA := true
+
 include kernel/project/virtual/test.mk
 include kernel/project/virtual/user.mk

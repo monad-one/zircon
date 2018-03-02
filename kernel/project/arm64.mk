@@ -9,7 +9,11 @@
 # for 64bit arm (cortex-a53)
 
 ARCH := arm64
-TARGET := qemu-virt
+TARGET := arm64
+SUB_TARGET := qemu-virt
+
+BUILD_BOOTDATA := true
+USE_TARGET_BUILD_DIR := true
 
 include kernel/project/virtual/test.mk
 include kernel/project/virtual/user.mk
